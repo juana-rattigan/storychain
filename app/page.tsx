@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function Home() {
   const [wallet, setWallet] = useState("");
@@ -11,12 +11,32 @@ export default function Home() {
     C:0,
   });
 
+  useEffect(() => {
+  const savedVotes = localStorage.getItem("votes");
+  const savedSelected = localStorage.getItem("selected");
+
+  if (savedVotes) {
+    setVotes(JSON.parse(savedVotes));
+  }
+
+  if (savedSelected) {
+    setSelected(savedSelected);
+  }
+}, []);
+
+useEffect(() => {
+  localStorage.setItem("votes", JSON.stringify(votes));
+}, [votes]);
+
+useEffect(() => {
+  localStorage.setItem("selected", selected);
+}, [selected]);
+
   async function connectWallet() {
     if (!(window as any).ethereum) {
       alert("MetaMask is not installed");
       return;
     }
-
     try {
       const accounts = await (window as any).ethereum.request({
         method: "eth_requestAccounts",
