@@ -130,7 +130,7 @@ useEffect(() => {
                 selected === "C" ? "bg-black text-white" : "hover:bg-gray-50"
               }`}
             >
-              C. Manganello
+              C. Mangonello
               <div className="text-sm mt-2">Votes: {votes.C}</div>
             </button>
           </div>
@@ -140,6 +140,17 @@ useEffect(() => {
               You voted for option {selected}.
             </p>
           )}
+          <button
+  onClick={() => {
+    setVotes({ A: 0, B: 0, C: 0 });
+    setSelected("");
+    localStorage.removeItem("votes");
+    localStorage.removeItem("selected");
+  }}
+  className="mt-4 border rounded-lg px-4 py-2 hover:bg-gray-100"
+>
+  Reset Vote
+</button>
         </div>
       </div>
     </main>
