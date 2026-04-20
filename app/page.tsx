@@ -1,42 +1,44 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 
 export default function Home() {
   const [wallet, setWallet] = useState("");
-  const[selected, setSelected] = useState("");
-  const[votes, setVotes] = useState ({
-    A:0,
-    B:0,
-    C:0,
+  const [selected, setSelected] = useState("");
+  const [votes, setVotes] = useState({
+    A: 0,
+    B: 0,
+    C: 0,
   });
 
   useEffect(() => {
-  const savedVotes = localStorage.getItem("votes");
-  const savedSelected = localStorage.getItem("selected");
+    const savedVotes = localStorage.getItem("votes");
+    const savedSelected = localStorage.getItem("selected");
 
-  if (savedVotes) {
-    setVotes(JSON.parse(savedVotes));
-  }
+    if (savedVotes) {
+      setVotes(JSON.parse(savedVotes));
+    }
 
-  if (savedSelected) {
-    setSelected(savedSelected);
-  }
-}, []);
+    if (savedSelected) {
+      setSelected(savedSelected);
+    }
+  }, []);
 
-useEffect(() => {
-  localStorage.setItem("votes", JSON.stringify(votes));
-}, [votes]);
+  useEffect(() => {
+    localStorage.setItem("votes", JSON.stringify(votes));
+  }, [votes]);
 
-useEffect(() => {
-  localStorage.setItem("selected", selected);
-}, [selected]);
+  useEffect(() => {
+    localStorage.setItem("selected", selected);
+  }, [selected]);
 
   async function connectWallet() {
     if (!(window as any).ethereum) {
       alert("MetaMask is not installed");
       return;
     }
+
     try {
       const accounts = await (window as any).ethereum.request({
         method: "eth_requestAccounts",
@@ -47,7 +49,8 @@ useEffect(() => {
       alert("Wallet connection failed");
     }
   }
- function vote(option: "A" | "B" | "C") {
+
+  function vote(option: "A" | "B" | "C") {
     if (selected) {
       alert("You already voted.");
       return;
@@ -59,6 +62,13 @@ useEffect(() => {
     }));
 
     setSelected(option);
+  }
+
+  function resetVote() {
+    setVotes({ A: 0, B: 0, C: 0 });
+    setSelected("");
+    localStorage.removeItem("votes");
+    localStorage.removeItem("selected");
   }
 
   return (
@@ -110,7 +120,14 @@ useEffect(() => {
                 selected === "A" ? "bg-black text-white" : "hover:bg-gray-50"
               }`}
             >
-              A. Bananino
+              <Image
+                src="/bananino.jpg"
+                alt="Bananino"
+                width={100}
+                height={500}
+                className="w-full max-h-80 object-contain rounded-lg mb-3 bg-gray-100"
+              />
+              <div>A. Bananino</div>
               <div className="text-sm mt-2">Votes: {votes.A}</div>
             </button>
 
@@ -120,7 +137,14 @@ useEffect(() => {
                 selected === "B" ? "bg-black text-white" : "hover:bg-gray-50"
               }`}
             >
-              B. Limoncello
+              <Image
+                src="/limoncello.jpg"
+                alt="Limoncello"
+                width={100}
+                height={500}
+                className="w-full max-h-80 object-contain rounded-lg mb-3 bg-gray-100"
+              />
+              <div>B. Limoncello</div>
               <div className="text-sm mt-2">Votes: {votes.B}</div>
             </button>
 
@@ -130,30 +154,29 @@ useEffect(() => {
                 selected === "C" ? "bg-black text-white" : "hover:bg-gray-50"
               }`}
             >
-              C. Mangonello
+              <Image
+                src="/manganello.jpg"
+                alt="Manganello"
+                width={100}
+                height={500}
+                className="w-full max-h-80 object-contain rounded-lg mb-3 bg-gray-100"    />
+              <div>C. Manganello</div>
               <div className="text-sm mt-2">Votes: {votes.C}</div>
             </button>
           </div>
 
           {selected && (
-            <p className="mt-6 font-semibold">
-              You voted for option {selected}.
-            </p>
+            <p className="mt-6 font-semibold">You voted for option {selected}.</p>
           )}
+
           <button
-  onClick={() => {
-    setVotes({ A: 0, B: 0, C: 0 });
-    setSelected("");
-    localStorage.removeItem("votes");
-    localStorage.removeItem("selected");
-  }}
-  className="mt-4 border rounded-lg px-4 py-2 hover:bg-gray-100"
->
-  Reset Vote
-</button>
+            onClick={resetVote}
+            className="mt-4 border rounded-lg px-4 py-2 hover:bg-gray-100"
+          >
+            Reset Vote
+          </button>
         </div>
       </div>
     </main>
   );
 }
-
