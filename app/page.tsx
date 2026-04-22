@@ -70,7 +70,22 @@ export default function Home() {
     localStorage.removeItem("votes");
     localStorage.removeItem("selected");
   }
+const totalVotes = votes.A + votes.B + votes.C;
 
+function getPercentage(count: number) {
+  if (totalVotes === 0) return 0;
+  return Math.round((count / totalVotes) * 100);
+}
+function getWinner() {
+  const entries = [
+    { name: "Bananino", votes: votes.A },
+    { name: "Limoncello", votes: votes.B },
+    { name: "Manganello", votes: votes.C },
+  ];
+
+  entries.sort((a, b) => b.votes - a.votes);
+  return entries[0];
+}
   return (
     <main className="min-h-screen bg-white text-black p-8">
       <div className="max-w-3xl mx-auto">
@@ -129,6 +144,7 @@ export default function Home() {
               />
               <div>A. Bananino</div>
               <div className="text-sm mt-2">Votes: {votes.A}</div>
+              <div className="text-sm mt-1">{getPercentage(votes.A)}%</div>
             </button>
 
             <button
@@ -146,6 +162,7 @@ export default function Home() {
               />
               <div>B. Limoncello</div>
               <div className="text-sm mt-2">Votes: {votes.B}</div>
+              <div className="text-sm mt-1">{getPercentage(votes.B)}%</div>
             </button>
 
             <button
@@ -162,9 +179,16 @@ export default function Home() {
                 className="w-full max-h-80 object-contain rounded-lg mb-3 bg-gray-100"    />
               <div>C. Manganello</div>
               <div className="text-sm mt-2">Votes: {votes.C}</div>
+              <div className="text-sm mt-1">{getPercentage(votes.C)}%</div>
             </button>
           </div>
-
+<div className="mt-8 border rounded-xl p-4 bg-gray-50">
+  <h4 className="text-lg font-semibold mb-2">Current leader</h4>
+  <p>
+    {getWinner().name} is leading with {getWinner().votes} vote
+    {getWinner().votes === 1 ? "" : "s"}.
+  </p>
+</div>
           {selected && (
             <p className="mt-6 font-semibold">You voted for option {selected}.</p>
           )}
