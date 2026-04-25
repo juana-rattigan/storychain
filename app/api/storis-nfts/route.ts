@@ -32,14 +32,19 @@ function getAlchemyApiKey() {
 }
 
 function getImageUrl(nft: AlchemyNft) {
-  return (
+  const imageUrl =
     nft.image?.cachedUrl ??
     nft.image?.pngUrl ??
     nft.image?.thumbnailUrl ??
     nft.image?.originalUrl ??
     nft.rawMetadata?.image ??
-    "/nfts/storis-voter-pass.gif"
-  );
+    "/nfts/storis-voter-pass.gif";
+
+  if (imageUrl.includes("/nfts/storis-voter-pass.png")) {
+    return imageUrl.replace("/nfts/storis-voter-pass.png", "/nfts/storis-voter-pass.gif");
+  }
+
+  return imageUrl;
 }
 
 function getTokenUri(nft: AlchemyNft) {
