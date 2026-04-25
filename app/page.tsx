@@ -28,6 +28,14 @@ type GeneratedStory = {
   story: string;
 };
 
+type ClaimedNft = {
+  tokenId: string;
+  name: string;
+  description: string;
+  imageUrl: string;
+  tokenUri: string;
+};
+
 const OPTION_TO_INDEX: Record<VoteOption, number> = {
   A: 0,
   B: 1,
@@ -62,6 +70,9 @@ export default function Home() {
   const [rewardNftAddress, setRewardNftAddress] = useState("");
   const [rewardAmount, setRewardAmount] = useState("");
   const [web3Status, setWeb3Status] = useState("");
+  const [claimedNfts, setClaimedNfts] = useState<ClaimedNft[]>([]);
+  const [loadingClaimedNfts, setLoadingClaimedNfts] = useState(false);
+  const [claimedNftsError, setClaimedNftsError] = useState("");
 
   const part2VideoRef = useRef<HTMLVideoElement | null>(null);
   const isSepoliaMode = Boolean(STORIS_VOTING_ADDRESS);
@@ -69,6 +80,16 @@ export default function Home() {
   useEffect(() => {
     loadVotes();
   }, [episodeId, wallet]);
+
+  useEffect(() => {
+    if (!wallet || !rewardNftAddress) {
+      setClaimedNfts([]);
+      setClaimedNftsError("");
+      return;
+    }
+
+    loadClaimedNfts(wallet, rewardNftAddress);
+  }, [wallet, rewardNftAddress]);
 
   async function connectWallet() {
     if (!isSepoliaMode) {
@@ -245,11 +266,46 @@ export default function Home() {
       await publicClient.waitForTransactionReceipt({ hash });
       setWeb3Status("Rewards claimed. Your NFT and STORIS tokens are now in your wallet.");
       await syncOnchainState(wallet);
+      if (rewardNftAddress) {
+        window.setTimeout(() => loadClaimedNfts(wallet, rewardNftAddress), 2500);
+      }
     } catch (error) {
       console.error(error);
       alert("Could not claim rewards");
     } finally {
       setClaimingRewards(false);
+    }
+  }
+
+  async function loadClaimedNfts(walletAddress = wallet, nftAddress = rewardNftAddress) {
+    if (!walletAddress || !nftAddress) {
+      return;
+    }
+
+    try {
+      setLoadingClaimedNfts(true);
+      setClaimedNftsError("");
+
+      const params = new URLSearchParams({
+        owner: walletAddress,
+        contract: nftAddress,
+      });
+      const res = await fetch(`/api/storis-nfts?${params.toString()}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Could not load your Storis NFT");
+      }
+
+      setClaimedNfts(data.nfts ?? []);
+    } catch (error) {
+      console.error(error);
+      setClaimedNfts([]);
+      setClaimedNftsError(
+        error instanceof Error ? error.message : "Could not load your Storis NFT"
+      );
+    } finally {
+      setLoadingClaimedNfts(false);
     }
   }
 
@@ -491,6 +547,48 @@ export default function Home() {
                   : "Vote first, then wait for finalization."}
               </p>
             </div>
+
+            <div className="mt-6 rounded-2xl border bg-gray-50 p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">Your Storis NFT</h3>
+                  <p className="text-sm text-gray-600">
+                    Alchemy checks your connected wallet for the voter pass NFT.
+                  </p>
+                </div>
+                <button
+                  onClick={() => loadClaimedNfts()}
+                  disabled={!wallet || !rewardNftAddress || loadingClaimedNfts}
+                  className="bg-white border px-4 py-2 rounded-full text-sm font-medium hover:bg-gray-100 transition disabled:opacity-60"
+                >
+                  {loadingClaimedNfts ? "Checking..." : "Refresh NFT"}
+                </button>
+              </div>
+
+              {!wallet ? (
+                <p className="mt-4 text-sm text-gray-600">
+                  Connect your wallet to see your claimed NFT.
+                </p>
+              ) : claimedNftsError ? (
+                <p className="mt-4 text-sm font-medium text-red-600">
+                  {claimedNftsError}
+                </p>
+              ) : loadingClaimedNfts ? (
+                <p className="mt-4 text-sm text-gray-600">
+                  Looking for your Storis NFT...
+                </p>
+              ) : claimedNfts.length > 0 ? (
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  {claimedNfts.map((nft) => (
+                    <ClaimedNftCard key={`${nft.tokenId}-${nft.name}`} nft={nft} />
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-gray-600">
+                  No Storis NFT found yet. Claim rewards after finalization, then refresh.
+                </p>
+              )}
+            </div>
           </section>
 
         <section className="bg-white rounded-3xl shadow-lg border p-8 mb-10">
@@ -704,5 +802,38 @@ function VoteCard({
         Votes: {votes}
       </p>
     </button>
+  );
+}
+
+function ClaimedNftCard({ nft }: { nft: ClaimedNft }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+      <img
+        src={nft.imageUrl}
+        alt={nft.name}
+        className="h-56 w-full bg-gray-100 object-cover"
+      />
+      <div className="p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-600">
+          Token #{nft.tokenId}
+        </p>
+        <h4 className="mt-2 text-lg font-bold">{nft.name}</h4>
+        {nft.description && (
+          <p className="mt-2 line-clamp-3 text-sm text-gray-600">
+            {nft.description}
+          </p>
+        )}
+        {nft.tokenUri && (
+          <a
+            href={nft.tokenUri}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 inline-flex text-sm font-medium text-pink-700 hover:text-pink-900"
+          >
+            View metadata
+          </a>
+        )}
+      </div>
+    </div>
   );
 }
