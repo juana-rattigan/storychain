@@ -229,21 +229,35 @@ export default function Home() {
   }
 
   async function vote(option: VoteOption) {
-    const activeWallet = wallet || (await connectWallet());
-
-    if (!activeWallet) {
-      return;
-    }
-
     if (selected) {
       alert("You already voted.");
       return;
     }
 
+    if (!isSepoliaMode) {
+      setWeb3Status("Sepolia contract is not configured for this deployment.");
+      return;
+    }
+
+    if (!(window as any).ethereum) {
+      alert("MetaMask is not installed");
+      return;
+    }
+
     try {
       setSubmittingVote(true);
+      await ensureSepoliaNetwork();
+
+      const accounts = (await (window as any).ethereum.request({
+        method: "eth_requestAccounts",
+      })) as `0x${string}`[];
+      const account = accounts[0];
+
+      if (!account) {
+        throw new Error("No MetaMask account selected");
+      }
+
       const walletClient = await getWalletClient();
-      const [account] = await walletClient.getAddresses();
       setWallet(account);
 
       const hash = await walletClient.writeContract({
@@ -889,10 +903,10 @@ function VoteCard({
     <button
       onClick={() => onVote(option)}
       disabled={disabled}
-      className={`rounded-2xl border p-4 text-left transition shadow-sm hover:shadow-md ${
+      className={`rounded-2xl border p-4 text-left transition shadow-sm hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60 ${
         selected
           ? "bg-black text-white border-black"
-          : "bg-white hover:-translate-y-1"
+          : "bg-white hover:-translate-y-1 disabled:hover:translate-y-0"
       }`}
     >
       <Image
