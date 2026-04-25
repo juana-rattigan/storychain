@@ -58,7 +58,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 }
 
 export default function Home() {
-  const [episodeId] = useState(2);
+  const [episodeId] = useState(1);
   const [wallet, setWallet] = useState("");
   const [selected, setSelected] = useState<VoteOption | "">("");
   const [votes, setVotes] = useState<VoteCounts>({
