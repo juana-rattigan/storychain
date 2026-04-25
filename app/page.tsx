@@ -44,6 +44,19 @@ const OPTION_TO_INDEX: Record<VoteOption, number> = {
 
 const INDEX_TO_OPTION: VoteOption[] = ["A", "B", "C"];
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const typedError = error as { shortMessage?: string; details?: string };
+    return typedError.shortMessage || typedError.details || fallback;
+  }
+
+  return fallback;
+}
+
 export default function Home() {
   const [episodeId] = useState(2);
   const [wallet, setWallet] = useState("");
@@ -210,7 +223,9 @@ export default function Home() {
       await syncOnchainState(wallet);
     } catch (error) {
       console.error(error);
-      alert("Vote failed");
+      const message = getErrorMessage(error, "Vote failed");
+      setWeb3Status(message);
+      alert(message);
     } finally {
       setSubmittingVote(false);
     }
@@ -746,7 +761,7 @@ export default function Home() {
               </div>
               <button
                 onClick={generateNextEpisode}
-                disabled={loadingVotes || generatingStory || totalVotes === 0}
+                disabled={loadingVotes || generatingStory}
                 className="rounded-full bg-amber-500 px-6 py-3 font-bold text-black transition hover:bg-amber-400 disabled:opacity-60"
               >
                 {generatingStory

@@ -3,7 +3,14 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const winner = body.winner || "Bananino";
+    const winnerNames: Record<string, string> = {
+      A: "Bananino",
+      B: "Limoncello",
+      C: "Manganello",
+    };
+    const winner = typeof body.winner === "string" ? body.winner : "A";
+    const winnerName = winnerNames[winner] ?? "Bananino";
+    const episodeId = Number(body.episodeId ?? 1);
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -16,7 +23,7 @@ export async function POST(req: Request) {
         messages: [
           {
             role: "user",
-            content: `Write the next dramatic episode of Storis. ${winner} won the vote. Make it funny, dramatic, and short.`,
+            content: `Write the next dramatic episode of Storis. ${winnerName} won the vote. Make it funny, dramatic, and short.`,
           },
         ],
       }),
@@ -28,10 +35,15 @@ export async function POST(req: Request) {
       data.choices?.[0]?.message?.content ||
       "Chaos erupts in the coast, as bananino finds out Strawberrina is leaving him for Manganello and having his baby";
 
-    return NextResponse.json({ story });
+    return NextResponse.json({ episodeId, winner, winnerName, story });
   } catch (error) {
     return NextResponse.json(
-      { story: "The story continues in mysterious ways..." },
+      {
+        episodeId: 1,
+        winner: "A",
+        winnerName: "Bananino",
+        story: "The story continues in mysterious ways...",
+      },
       { status: 200 }
     );
   }
