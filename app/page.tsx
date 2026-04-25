@@ -95,6 +95,36 @@ export default function Home() {
   }, [episodeId, wallet]);
 
   useEffect(() => {
+    if (!isSepoliaMode || typeof window === "undefined" || !(window as any).ethereum) {
+      return;
+    }
+
+    const ethereum = (window as any).ethereum;
+
+    async function loadConnectedWallet() {
+      const accounts = (await ethereum.request({
+        method: "eth_accounts",
+      })) as string[];
+
+      setWallet(accounts[0] ?? "");
+    }
+
+    function handleAccountsChanged(accounts: string[]) {
+      setWallet(accounts[0] ?? "");
+    }
+
+    loadConnectedWallet().catch((error) => {
+      console.error("Could not load connected wallet:", error);
+    });
+
+    ethereum.on?.("accountsChanged", handleAccountsChanged);
+
+    return () => {
+      ethereum.removeListener?.("accountsChanged", handleAccountsChanged);
+    };
+  }, [isSepoliaMode]);
+
+  useEffect(() => {
     if (!wallet || !rewardNftAddress) {
       setClaimedNfts([]);
       setClaimedNftsError("");
@@ -104,15 +134,15 @@ export default function Home() {
     loadClaimedNfts(wallet, rewardNftAddress);
   }, [wallet, rewardNftAddress]);
 
-  async function connectWallet() {
+  async function connectWallet(): Promise<string | undefined> {
     if (!isSepoliaMode) {
       setWeb3Status("Sepolia contract is not configured for this deployment.");
-      return;
+      return undefined;
     }
 
     if (!(window as any).ethereum) {
       alert("MetaMask is not installed");
-      return;
+      return undefined;
     }
 
     try {
@@ -127,9 +157,13 @@ export default function Home() {
       setWeb3Status("Connected to MetaMask for Sepolia voting.");
 
       await checkExistingVote(connectedWallet);
+      return connectedWallet;
     } catch (error) {
       console.error(error);
-      alert("Wallet connection failed");
+      const message = getErrorMessage(error, "Wallet connection failed");
+      setWeb3Status(message);
+      alert(message);
+      return undefined;
     }
   }
 
@@ -195,8 +229,9 @@ export default function Home() {
   }
 
   async function vote(option: VoteOption) {
-    if (!wallet) {
-      alert("Connect your wallet first.");
+    const activeWallet = wallet || (await connectWallet());
+
+    if (!activeWallet) {
       return;
     }
 
@@ -209,6 +244,7 @@ export default function Home() {
       setSubmittingVote(true);
       const walletClient = await getWalletClient();
       const [account] = await walletClient.getAddresses();
+      setWallet(account);
 
       const hash = await walletClient.writeContract({
         account,
@@ -220,7 +256,7 @@ export default function Home() {
 
       await publicClient.waitForTransactionReceipt({ hash });
       setWeb3Status("Vote confirmed on Sepolia.");
-      await syncOnchainState(wallet);
+      await syncOnchainState(account);
     } catch (error) {
       console.error(error);
       const message = getErrorMessage(error, "Vote failed");
