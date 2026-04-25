@@ -38,7 +38,7 @@ function getImageUrl(nft: AlchemyNft) {
     nft.image?.thumbnailUrl ??
     nft.image?.originalUrl ??
     nft.rawMetadata?.image ??
-    "/nfts/storis-voter-pass.png"
+    "/nfts/storis-voter-pass.gif"
   );
 }
 

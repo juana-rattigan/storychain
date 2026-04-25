@@ -31,7 +31,7 @@ export async function GET(
       : "Manganello";
 
   const imageUrl = new URL(
-    "/nfts/storis-voter-pass.png",
+    "/nfts/storis-voter-pass.gif",
     request.url
   ).toString();
 
