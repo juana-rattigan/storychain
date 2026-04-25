@@ -1,7 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { formatUnits } from "viem";
+
+import {
+  STORIS_VOTING_ABI,
+  STORIS_VOTING_ADDRESS,
+  ensureSepoliaNetwork,
+  getVotingContract,
+  getWalletClient,
+  publicClient,
+} from "../lib/storis-sepolia";
 
 type VoteOption = "A" | "B" | "C";
 
@@ -18,9 +28,18 @@ type GeneratedStory = {
   story: string;
 };
 
+const OPTION_TO_INDEX: Record<VoteOption, number> = {
+  A: 0,
+  B: 1,
+  C: 2,
+};
+
+const INDEX_TO_OPTION: VoteOption[] = ["A", "B", "C"];
+
 export default function Home() {
+  const [episodeId] = useState(1);
   const [wallet, setWallet] = useState("");
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useState<VoteOption | "">("");
   const [votes, setVotes] = useState<VoteCounts>({
     A: 0,
     B: 0,
@@ -33,26 +52,45 @@ export default function Home() {
     null
   );
   const [storyError, setStoryError] = useState("");
+  const [showPart2, setShowPart2] = useState(false);
+  const [isEpisodeFinalized, setIsEpisodeFinalized] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  const [canClaimRewards, setCanClaimRewards] = useState(false);
+  const [claimingRewards, setClaimingRewards] = useState(false);
+  const [finalizingEpisode, setFinalizingEpisode] = useState(false);
+  const [rewardTokenAddress, setRewardTokenAddress] = useState("");
+  const [rewardNftAddress, setRewardNftAddress] = useState("");
+  const [rewardAmount, setRewardAmount] = useState("");
+  const [web3Status, setWeb3Status] = useState("");
 
-  const episodeId = 1;
+  const part2VideoRef = useRef<HTMLVideoElement | null>(null);
+  const isSepoliaMode = Boolean(STORIS_VOTING_ADDRESS);
 
   useEffect(() => {
     loadVotes();
-  }, []);
+  }, [episodeId, wallet]);
 
   async function connectWallet() {
+    if (!isSepoliaMode) {
+      setWeb3Status("Sepolia contract is not configured for this deployment.");
+      return;
+    }
+
     if (!(window as any).ethereum) {
       alert("MetaMask is not installed");
       return;
     }
 
     try {
-      const accounts = await (window as any).ethereum.request({
+      await ensureSepoliaNetwork();
+
+      const accounts = (await (window as any).ethereum.request({
         method: "eth_requestAccounts",
-      });
+      })) as string[];
 
       const connectedWallet = accounts[0];
       setWallet(connectedWallet);
+      setWeb3Status("Connected to MetaMask for Sepolia voting.");
 
       await checkExistingVote(connectedWallet);
     } catch (error) {
@@ -63,14 +101,7 @@ export default function Home() {
 
   async function checkExistingVote(walletAddress: string) {
     try {
-      const res = await fetch(
-        `/api/vote-status?episodeId=${episodeId}&wallet=${walletAddress}`
-      );
-      const data = await res.json();
-
-      if (res.ok && data.selected) {
-        setSelected(data.selected);
-      }
+      await syncOnchainState(walletAddress);
     } catch (error) {
       console.error("Failed to check existing vote:", error);
     }
@@ -79,25 +110,54 @@ export default function Home() {
   async function loadVotes() {
     try {
       setLoadingVotes(true);
-
-      const res = await fetch(`/api/results?episodeId=${episodeId}`);
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to load votes");
-      }
-
-      setVotes({
-        A: data.votes.A || 0,
-        B: data.votes.B || 0,
-        C: data.votes.C || 0,
-      });
+      await syncOnchainState(wallet || undefined);
     } catch (error) {
       console.error(error);
       alert("Could not load vote totals");
     } finally {
       setLoadingVotes(false);
     }
+  }
+
+  async function syncOnchainState(walletAddress?: string) {
+    const contract = getVotingContract();
+    const [counts, episode, owner, token, nft, reward] = await Promise.all([
+      contract.read.getVoteCounts([BigInt(episodeId)]),
+      contract.read.getEpisode([BigInt(episodeId)]),
+      contract.read.owner(),
+      contract.read.rewardToken(),
+      contract.read.voterPassNft(),
+      contract.read.rewardPerVote(),
+    ]);
+
+    setVotes({
+      A: Number(counts[0]),
+      B: Number(counts[1]),
+      C: Number(counts[2]),
+    });
+    setIsEpisodeFinalized(episode.finalized);
+    setRewardTokenAddress(token);
+    setRewardNftAddress(nft);
+    setRewardAmount(formatUnits(reward, 18));
+
+    if (!walletAddress) {
+      setSelected("");
+      setCanClaimRewards(false);
+      setIsOwner(false);
+      return;
+    }
+
+    const [voteOf, claimed] = await Promise.all([
+      contract.read.getVoteOf([BigInt(episodeId), walletAddress as `0x${string}`]),
+      contract.read.hasClaimedRewards([
+        BigInt(episodeId),
+        walletAddress as `0x${string}`,
+      ]),
+    ]);
+
+    setSelected(voteOf <= 2 ? INDEX_TO_OPTION[Number(voteOf)] : "");
+    setCanClaimRewards(episode.finalized && voteOf <= 2 && !claimed);
+    setIsOwner(owner.toLowerCase() === walletAddress.toLowerCase());
   }
 
   async function vote(option: VoteOption) {
@@ -113,28 +173,20 @@ export default function Home() {
 
     try {
       setSubmittingVote(true);
+      const walletClient = await getWalletClient();
+      const [account] = await walletClient.getAddresses();
 
-      const res = await fetch("/api/vote", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          episodeId,
-          wallet,
-          choiceKey: option,
-        }),
+      const hash = await walletClient.writeContract({
+        account,
+        address: STORIS_VOTING_ADDRESS!,
+        abi: STORIS_VOTING_ABI,
+        functionName: "vote",
+        args: [BigInt(episodeId), OPTION_TO_INDEX[option]],
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.error || "Vote failed");
-        return;
-      }
-
-      setSelected(option);
-      await loadVotes();
+      await publicClient.waitForTransactionReceipt({ hash });
+      setWeb3Status("Vote confirmed on Sepolia.");
+      await syncOnchainState(wallet);
     } catch (error) {
       console.error(error);
       alert("Vote failed");
@@ -143,7 +195,65 @@ export default function Home() {
     }
   }
 
-  async function generateNextStory() {
+  async function finalizeEpisodeOnchain() {
+    if (!wallet || !isSepoliaMode) {
+      return;
+    }
+
+    try {
+      setFinalizingEpisode(true);
+      const walletClient = await getWalletClient();
+      const [account] = await walletClient.getAddresses();
+
+      const hash = await walletClient.writeContract({
+        account,
+        address: STORIS_VOTING_ADDRESS!,
+        abi: STORIS_VOTING_ABI,
+        functionName: "finalizeEpisode",
+        args: [BigInt(episodeId), OPTION_TO_INDEX[winner.key as VoteOption]],
+      });
+
+      await publicClient.waitForTransactionReceipt({ hash });
+      setWeb3Status("Episode finalized on Sepolia. Voters can now claim rewards.");
+      await syncOnchainState(wallet);
+    } catch (error) {
+      console.error(error);
+      alert("Could not finalize the episode");
+    } finally {
+      setFinalizingEpisode(false);
+    }
+  }
+
+  async function claimRewardsOnchain() {
+    if (!wallet || !isSepoliaMode) {
+      return;
+    }
+
+    try {
+      setClaimingRewards(true);
+      const walletClient = await getWalletClient();
+      const [account] = await walletClient.getAddresses();
+
+      const hash = await walletClient.writeContract({
+        account,
+        address: STORIS_VOTING_ADDRESS!,
+        abi: STORIS_VOTING_ABI,
+        functionName: "claimRewards",
+        args: [BigInt(episodeId)],
+      });
+
+      await publicClient.waitForTransactionReceipt({ hash });
+      setWeb3Status("Rewards claimed. Your NFT and STORIS tokens are now in your wallet.");
+      await syncOnchainState(wallet);
+    } catch (error) {
+      console.error(error);
+      alert("Could not claim rewards");
+    } finally {
+      setClaimingRewards(false);
+    }
+  }
+
+  async function generateNextEpisode() {
     try {
       setGeneratingStory(true);
       setStoryError("");
@@ -153,22 +263,47 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ episodeId }),
+        body: JSON.stringify({
+          episodeId,
+          winner: isSepoliaMode ? (winner.key as VoteOption) : undefined,
+        }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to generate the next story");
+        throw new Error(data.error || "Could not generate the next episode");
       }
 
-      setGeneratedStory(data);
+      setGeneratedStory({
+        episodeId: data.episodeId,
+        winner: data.winner,
+        winnerName: data.winnerName,
+        story: data.story,
+      });
+
+      setShowPart2(true);
+
+      setTimeout(() => {
+        if (part2VideoRef.current) {
+          part2VideoRef.current.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+
+          part2VideoRef.current.currentTime = 0;
+          part2VideoRef.current.play().catch((error) => {
+            console.error("Autoplay failed:", error);
+          });
+        }
+      }, 100);
     } catch (error) {
       console.error(error);
+      setGeneratedStory(null);
       setStoryError(
         error instanceof Error
           ? error.message
-          : "Failed to generate the next story"
+          : "Could not generate the next episode"
       );
     } finally {
       setGeneratingStory(false);
@@ -202,18 +337,23 @@ export default function Home() {
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-pink-600 mb-3">
             Web3 Interactive Storytelling
           </p>
-          <h1 className="text-5xl font-extrabold mb-4">StoryChain</h1>
+          <h1 className="text-5xl font-extrabold mb-4">Storis</h1>
           <p className="text-lg max-w-2xl mx-auto text-gray-600">
             A community-driven storytelling platform where users connect their
-            wallet, vote on the next plot twist, and shape the future of the story.
+            wallet, vote on the next plot twist, and shape the future of the
+            story.
           </p>
 
-          <div className="mt-6">
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <button
               onClick={connectWallet}
               className="bg-black text-white px-6 py-3 rounded-full font-medium hover:opacity-90 transition"
             >
-              {wallet ? "Wallet Connected" : "Connect Wallet"}
+              {wallet
+                ? isSepoliaMode
+                  ? "Wallet Connected To Sepolia"
+                  : "Wallet Connected"
+                : "Connect Wallet"}
             </button>
           </div>
 
@@ -222,6 +362,36 @@ export default function Home() {
               <strong>Connected wallet:</strong> {wallet}
             </p>
           )}
+
+          {isSepoliaMode && (
+            <p className="mt-2 text-sm text-pink-700">
+              Sepolia mode is active. Votes, NFT claims, and STORIS rewards will
+              go through your deployed contract.
+            </p>
+          )}
+        </section>
+
+        <section className="grid md:grid-cols-3 gap-4 mb-10">
+          <div className="bg-white rounded-2xl border p-5 shadow-sm">
+            <h5 className="font-semibold mb-2">1. Connect Wallet</h5>
+            <p className="text-sm text-gray-600">
+              Users connect MetaMask to participate in the story.
+            </p>
+          </div>
+          <div className="bg-white rounded-2xl border p-5 shadow-sm">
+            <h5 className="font-semibold mb-2">2. Vote On Sepolia</h5>
+            <p className="text-sm text-gray-600">
+              The vote is recorded on-chain, and every voter becomes eligible
+              for rewards.
+            </p>
+          </div>
+          <div className="bg-white rounded-2xl border p-5 shadow-sm">
+            <h5 className="font-semibold mb-2">3. Claim NFT + Tokens</h5>
+            <p className="text-sm text-gray-600">
+              Once the episode is finalized, every voter can claim a
+              participation NFT and STORIS reward.
+            </p>
+          </div>
         </section>
 
         <section className="grid md:grid-cols-3 gap-4 mb-10">
@@ -239,15 +409,127 @@ export default function Home() {
           </div>
         </section>
 
+        <section className="bg-white rounded-3xl shadow-sm border p-6 mb-10">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 className="text-2xl font-bold mb-2">Sepolia Rewards</h2>
+                <p className="text-gray-600 max-w-2xl">
+                  Voters receive a participation NFT and STORIS tokens after the
+                  episode is finalized on-chain.
+                </p>
+              </div>
+              {web3Status && (
+                <p className="text-sm text-pink-700 font-medium">{web3Status}</p>
+              )}
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3 mt-6">
+              <div className="bg-gray-50 rounded-2xl border p-4">
+                <p className="text-sm text-gray-500 mb-1">Voting Contract</p>
+                <p className="text-sm font-medium break-all">
+                  {STORIS_VOTING_ADDRESS}
+                </p>
+              </div>
+              <div className="bg-gray-50 rounded-2xl border p-4">
+                <p className="text-sm text-gray-500 mb-1">Reward Token</p>
+                <p className="text-sm font-medium break-all">
+                  {rewardTokenAddress || "Load after deploy"}
+                </p>
+              </div>
+              <div className="bg-gray-50 rounded-2xl border p-4">
+                <p className="text-sm text-gray-500 mb-1">Voter NFT</p>
+                <p className="text-sm font-medium break-all">
+                  {rewardNftAddress || "Load after deploy"}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                onClick={finalizeEpisodeOnchain}
+                disabled={!wallet || !isOwner || isEpisodeFinalized || finalizingEpisode}
+                className="bg-black text-white px-5 py-3 rounded-full font-medium hover:opacity-90 transition disabled:opacity-60"
+              >
+                {isEpisodeFinalized
+                  ? "Episode Finalized"
+                  : finalizingEpisode
+                  ? "Finalizing..."
+                  : "Finalize Episode"}
+              </button>
+              <button
+                onClick={claimRewardsOnchain}
+                disabled={!wallet || !canClaimRewards || claimingRewards}
+                className="bg-green-600 text-white px-5 py-3 rounded-full font-medium hover:opacity-90 transition disabled:opacity-60"
+              >
+                {!wallet
+                  ? "Connect Wallet To Claim"
+                  : claimingRewards
+                  ? "Claiming Rewards..."
+                  : canClaimRewards
+                  ? "Claim NFT + Tokens"
+                  : selected && isEpisodeFinalized
+                  ? "Already Claimed"
+                  : "Claim NFT + Tokens"}
+              </button>
+            </div>
+
+            <div className="mt-4 text-sm text-gray-600 space-y-1">
+              <p>
+                <strong>Status:</strong>{" "}
+                {isEpisodeFinalized ? "Voting closed, rewards unlocked." : "Voting open."}
+              </p>
+              <p>
+                <strong>Reward per voter:</strong>{" "}
+                {rewardAmount ? `${rewardAmount} STORIS` : "Will load from contract"}
+              </p>
+              <p>
+                <strong>Your claim:</strong>{" "}
+                {canClaimRewards
+                  ? "Ready to claim."
+                  : selected && isEpisodeFinalized
+                  ? "Already claimed or already checked."
+                  : "Vote first, then wait for finalization."}
+              </p>
+            </div>
+          </section>
+
         <section className="bg-white rounded-3xl shadow-lg border p-8 mb-10">
           <h2 className="text-3xl font-bold mb-4">
             Strawberrina and Bananino: The Next Part
           </h2>
 
+          <div className="grid gap-6 md:grid-cols-2 mb-8">
+            <div>
+              <h3 className="text-xl font-semibold mb-3">Part 1</h3>
+              <video
+                src="/part1.mp4"
+                controls
+                className="w-full rounded-2xl border bg-black"
+              >
+                Your browser does not support the video tag.
+              </video>
+            </div>
+
+            {showPart2 && (
+              <div>
+                <h3 className="text-xl font-semibold mb-3">Part 2</h3>
+                <video
+                  ref={part2VideoRef}
+                  src="/part2.mp4"
+                  controls
+                  muted
+                  className="w-full rounded-2xl border bg-black"
+                >
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+            )}
+          </div>
+
           <p className="text-gray-700 mb-4 leading-7">
-            Strawberrina looks deeply into Bananino&apos;s eyes and swears to him
-            that the baby is, in fact, his. “I love you so much. I would never
-            cheat on you again, Bananino, I swear.”
+            Strawberrina looks deeply into Bananino&apos;s eyes and swears to
+            him that the baby is, in fact, his. “I love you so much. I would
+            never cheat on you again, Bananino, I swear.”
           </p>
 
           <p className="text-gray-700 mb-6 leading-7">
@@ -261,7 +543,8 @@ export default function Home() {
           <div className="bg-pink-50 border border-pink-100 rounded-2xl p-4 mb-8">
             <h3 className="text-xl font-semibold mb-2">Choose the baby daddy</h3>
             <p className="text-gray-600 text-sm">
-              Connect your wallet and cast one vote. Each wallet can vote once.
+              Connect MetaMask on Sepolia and cast one on-chain vote. After
+              finalization, voters can claim an NFT and STORIS reward.
             </p>
           </div>
 
@@ -273,7 +556,7 @@ export default function Home() {
               votes={votes.A}
               percentage={getPercentage(votes.A)}
               selected={selected === "A"}
-              disabled={submittingVote}
+              disabled={submittingVote || isEpisodeFinalized}
               onVote={vote}
             />
 
@@ -284,7 +567,7 @@ export default function Home() {
               votes={votes.B}
               percentage={getPercentage(votes.B)}
               selected={selected === "B"}
-              disabled={submittingVote}
+              disabled={submittingVote || isEpisodeFinalized}
               onVote={vote}
             />
 
@@ -295,7 +578,7 @@ export default function Home() {
               votes={votes.C}
               percentage={getPercentage(votes.C)}
               selected={selected === "C"}
-              disabled={submittingVote}
+              disabled={submittingVote || isEpisodeFinalized}
               onVote={vote}
             />
           </div>
@@ -322,17 +605,28 @@ export default function Home() {
               <p className="mt-3 text-gray-500 text-sm">Submitting vote...</p>
             )}
 
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+          </div>
+
+          <div className="mt-8 rounded-2xl border border-yellow-200 bg-yellow-50 p-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h4 className="text-lg font-semibold">
+                  Generate the next episode
+                </h4>
+                <p className="text-sm text-gray-600">
+                  Use the current winning vote to create the next Storis
+                  chapter instantly.
+                </p>
+              </div>
               <button
-                onClick={generateNextStory}
-                disabled={generatingStory || loadingVotes || totalVotes === 0}
-                className="bg-pink-600 text-white px-5 py-3 rounded-full font-medium transition hover:bg-pink-700 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={generateNextEpisode}
+                disabled={loadingVotes || generatingStory || totalVotes === 0}
+                className="bg-yellow-500 text-black px-6 py-3 rounded-full font-semibold hover:opacity-90 transition disabled:opacity-60"
               >
-                {generatingStory ? "Generating..." : "Generate Next Story"}
+                {generatingStory
+                  ? "Generating Episode..."
+                  : "Generate Next Episode"}
               </button>
-              <p className="text-sm text-gray-500">
-                Generates episode #{episodeId + 1} from the current vote winner.
-              </p>
             </div>
 
             {storyError && (
@@ -340,45 +634,21 @@ export default function Home() {
                 {storyError}
               </p>
             )}
-          </div>
 
-          {generatedStory && (
-            <div className="mt-8 rounded-2xl border border-yellow-200 bg-yellow-50 p-6">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-yellow-700">
-                Generated Episode
-              </p>
-              <h4 className="mt-2 text-2xl font-bold text-gray-900">
-                Episode #{generatedStory.episodeId}
-              </h4>
-              <p className="mt-2 text-sm text-gray-600">
-                Based on the winning vote: {generatedStory.winner}.{" "}
-                {generatedStory.winnerName}
-              </p>
-              <div className="mt-4 whitespace-pre-wrap text-gray-800 leading-7">
-                {generatedStory.story}
+            {generatedStory && (
+              <div className="mt-6 rounded-2xl bg-white p-5 shadow-sm">
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-pink-600">
+                  Episode #{generatedStory.episodeId}
+                </p>
+                <p className="mt-2 text-sm text-gray-600">
+                  Based on the winning vote: {generatedStory.winner}.{" "}
+                  {generatedStory.winnerName}
+                </p>
+                <div className="mt-4 whitespace-pre-line text-gray-800 leading-7">
+                  {generatedStory.story}
+                </div>
               </div>
-            </div>
-          )}
-        </section>
-
-        <section className="grid md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl border p-5 shadow-sm">
-            <h5 className="font-semibold mb-2">1. Connect Wallet</h5>
-            <p className="text-sm text-gray-600">
-              Users connect MetaMask to participate in the story.
-            </p>
-          </div>
-          <div className="bg-white rounded-2xl border p-5 shadow-sm">
-            <h5 className="font-semibold mb-2">2. Vote on the Plot</h5>
-            <p className="text-sm text-gray-600">
-              The community decides what happens next by voting on story outcomes.
-            </p>
-          </div>
-          <div className="bg-white rounded-2xl border p-5 shadow-sm">
-            <h5 className="font-semibold mb-2">3. Story Evolves</h5>
-            <p className="text-sm text-gray-600">
-              The winning option becomes the next episode of the StoryChain universe.
-            </p>
+            )}
           </div>
         </section>
       </div>
