@@ -264,7 +264,7 @@ export default function Home() {
       });
 
       await publicClient.waitForTransactionReceipt({ hash });
-      setWeb3Status("Rewards claimed. Your NFT and STORIS tokens are now in your wallet.");
+      setWeb3Status("Rewards claimed. Your NFT and STORIS token is now in your wallet.");
       await syncOnchainState(wallet);
       if (rewardNftAddress) {
         window.setTimeout(() => loadClaimedNfts(wallet, rewardNftAddress), 2500);
@@ -385,116 +385,125 @@ export default function Home() {
   }
 
   const winner = getWinner();
+  const walletLabel = wallet
+    ? `${wallet.slice(0, 6)}...${wallet.slice(-4)}`
+    : "";
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-pink-50 via-white to-yellow-50 text-gray-900">
-      <div className="max-w-5xl mx-auto px-6 py-10">
-        <section className="text-center mb-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-pink-600 mb-3">
-            Web3 Interactive Storytelling
-          </p>
-          <h1 className="text-5xl font-extrabold mb-4">Storis</h1>
-          <p className="text-lg max-w-2xl mx-auto text-gray-600">
-            A community-driven storytelling platform where users connect their
-            wallet, vote on the next plot twist, and shape the future of the
-            story.
-          </p>
-
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+    <main className="min-h-screen bg-[#fffaf1] text-slate-950">
+      <div className="mx-auto max-w-7xl px-5 py-6 md:px-8">
+        <nav className="mb-8 flex flex-wrap items-center justify-between gap-4 rounded-[2rem] border border-slate-900/10 bg-white/80 px-5 py-4 shadow-sm backdrop-blur">
+          <div>
+            <p className="text-3xl font-black tracking-tight">storis</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-violet-700">
+              Create stories. Back them. Own them.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {wallet && (
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800">
+                {walletLabel}
+              </span>
+            )}
             <button
               onClick={connectWallet}
-              className="bg-black text-white px-6 py-3 rounded-full font-medium hover:opacity-90 transition"
+              className="rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-violet-800"
             >
               {wallet
                 ? isSepoliaMode
-                  ? "Wallet Connected To Sepolia"
+                  ? "Wallet connected"
                   : "Wallet Connected"
                 : "Connect Wallet"}
             </button>
           </div>
+        </nav>
 
-          {wallet && (
-            <p className="mt-4 text-sm text-gray-600 break-all">
-              <strong>Connected wallet:</strong> {wallet}
+        <section className="mb-8 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="rounded-[2.5rem] border border-slate-900 bg-white p-7 shadow-[0_24px_70px_rgba(15,23,42,0.12)] md:p-10">
+            <p className="mb-4 inline-flex rounded-full bg-violet-100 px-4 py-2 text-xs font-bold uppercase tracking-[0.22em] text-violet-800">
+              Creator ownership platform
             </p>
-          )}
+            <h1 className="max-w-3xl text-5xl font-black leading-[0.95] tracking-tight md:text-7xl">
+              Stories that fans can shape, collect, and remember.
+            </h1>
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
+              Storis turns interactive episodes into verifiable participation.
+              Audiences vote on-chain, creators continue the narrative, and
+              supporters earn a voter pass NFT plus STORIS rewards.
+            </p>
+            <div className="mt-8 grid gap-3 sm:grid-cols-4">
+              <WorkflowStep title="Create" body="Publish a story world" />
+              <WorkflowStep title="Back" body="Let fans vote on-chain" />
+              <WorkflowStep title="Own" body="Mint proof of support" />
+              <WorkflowStep title="Earn" body="Reward active readers" />
+            </div>
+          </div>
 
-          {isSepoliaMode && (
-            <p className="mt-2 text-sm text-pink-700">
-              Sepolia mode is active. Votes, NFT claims, and STORIS rewards will
-              go through your deployed contract.
-            </p>
-          )}
+          <div className="grid gap-4">
+            <div className="rounded-[2rem] border border-slate-900 bg-slate-950 p-6 text-white shadow-xl">
+              <p className="text-sm font-bold uppercase tracking-[0.24em] text-amber-300">
+                Live episode
+              </p>
+              <p className="mt-3 text-5xl font-black">#{episodeId}</p>
+              <p className="mt-3 text-slate-300">
+                Current leader: <span className="text-white">{winner.name}</span>
+              </p>
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <Metric label="Total votes" value={totalVotes.toString()} />
+                <Metric
+                  label="Status"
+                  value={isEpisodeFinalized ? "Finalized" : "Open"}
+                />
+              </div>
+            </div>
+            <div className="rounded-[2rem] border border-slate-900/10 bg-white p-6 shadow-sm">
+              <p className="text-sm font-bold uppercase tracking-[0.22em] text-rose-600">
+                MVP modules
+              </p>
+              <div className="mt-4 grid gap-3">
+                <ModuleRow title="On-chain voting" detail="Ethereum Sepolia" />
+                <ModuleRow title="NFT participation pass" detail="Alchemy indexed" />
+                <ModuleRow title="AI continuation" detail="OpenRouter route" />
+              </div>
+            </div>
+          </div>
         </section>
 
-        <section className="grid md:grid-cols-3 gap-4 mb-10">
-          <div className="bg-white rounded-2xl border p-5 shadow-sm">
-            <h5 className="font-semibold mb-2">1. Connect Wallet</h5>
-            <p className="text-sm text-gray-600">
-              Users connect MetaMask to participate in the story.
-            </p>
-          </div>
-          <div className="bg-white rounded-2xl border p-5 shadow-sm">
-            <h5 className="font-semibold mb-2">2. Vote On Sepolia</h5>
-            <p className="text-sm text-gray-600">
-              The vote is recorded on-chain, and every voter becomes eligible
-              for rewards.
-            </p>
-          </div>
-          <div className="bg-white rounded-2xl border p-5 shadow-sm">
-            <h5 className="font-semibold mb-2">3. Claim NFT + Tokens</h5>
-            <p className="text-sm text-gray-600">
-              Once the episode is finalized, every voter can claim a
-              participation NFT and STORIS reward.
-            </p>
-          </div>
-        </section>
-
-        <section className="grid md:grid-cols-3 gap-4 mb-10">
-          <div className="bg-white rounded-2xl shadow-sm border p-5">
-            <p className="text-sm text-gray-500 mb-1">Episode</p>
-            <p className="text-2xl font-bold">#{episodeId}</p>
-          </div>
-          <div className="bg-white rounded-2xl shadow-sm border p-5">
-            <p className="text-sm text-gray-500 mb-1">Total Votes</p>
-            <p className="text-2xl font-bold">{totalVotes}</p>
-          </div>
-          <div className="bg-white rounded-2xl shadow-sm border p-5">
-            <p className="text-sm text-gray-500 mb-1">Current Leader</p>
-            <p className="text-2xl font-bold">{winner.name}</p>
-          </div>
-        </section>
-
-        <section className="bg-white rounded-3xl shadow-sm border p-6 mb-10">
+        <section className="mb-8 rounded-[2.5rem] border border-slate-900 bg-white p-6 shadow-sm md:p-8">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div>
-                <h2 className="text-2xl font-bold mb-2">Sepolia Rewards</h2>
-                <p className="text-gray-600 max-w-2xl">
-                  Voters receive a participation NFT and STORIS tokens after the
-                  episode is finalized on-chain.
+                <p className="text-sm font-bold uppercase tracking-[0.22em] text-violet-700">
+                  Creator and community rewards
+                </p>
+                <h2 className="mt-2 text-3xl font-black">Participation ownership</h2>
+                <p className="mt-2 max-w-2xl text-slate-600">
+                  Voters receive a Storis voter pass NFT and STORIS token after
+                  the episode is finalized on-chain.
                 </p>
               </div>
               {web3Status && (
-                <p className="text-sm text-pink-700 font-medium">{web3Status}</p>
+                <p className="rounded-full bg-pink-50 px-4 py-2 text-sm font-semibold text-pink-700">
+                  {web3Status}
+                </p>
               )}
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3 mt-6">
-              <div className="bg-gray-50 rounded-2xl border p-4">
-                <p className="text-sm text-gray-500 mb-1">Voting Contract</p>
-                <p className="text-sm font-medium break-all">
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="mb-1 text-sm text-slate-500">Voting Contract</p>
+                <p className="break-all text-sm font-semibold">
                   {STORIS_VOTING_ADDRESS}
                 </p>
               </div>
-              <div className="bg-gray-50 rounded-2xl border p-4">
-                <p className="text-sm text-gray-500 mb-1">Reward Token</p>
-                <p className="text-sm font-medium break-all">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="mb-1 text-sm text-slate-500">Reward Token</p>
+                <p className="break-all text-sm font-semibold">
                   {rewardTokenAddress || "Load after deploy"}
                 </p>
               </div>
-              <div className="bg-gray-50 rounded-2xl border p-4">
-                <p className="text-sm text-gray-500 mb-1">Voter NFT</p>
-                <p className="text-sm font-medium break-all">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="mb-1 text-sm text-slate-500">Voter NFT</p>
+                <p className="break-all text-sm font-semibold">
                   {rewardNftAddress || "Load after deploy"}
                 </p>
               </div>
@@ -504,7 +513,7 @@ export default function Home() {
               <button
                 onClick={finalizeEpisodeOnchain}
                 disabled={!wallet || !isOwner || isEpisodeFinalized || finalizingEpisode}
-                className="bg-black text-white px-5 py-3 rounded-full font-medium hover:opacity-90 transition disabled:opacity-60"
+                className="rounded-full bg-slate-950 px-5 py-3 font-bold text-white transition hover:bg-violet-800 disabled:opacity-60"
               >
                 {isEpisodeFinalized
                   ? "Episode Finalized"
@@ -515,7 +524,7 @@ export default function Home() {
               <button
                 onClick={claimRewardsOnchain}
                 disabled={!wallet || !canClaimRewards || claimingRewards}
-                className="bg-green-600 text-white px-5 py-3 rounded-full font-medium hover:opacity-90 transition disabled:opacity-60"
+                className="rounded-full bg-emerald-600 px-5 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-60"
               >
                 {!wallet
                   ? "Connect Wallet To Claim"
@@ -529,7 +538,7 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="mt-4 text-sm text-gray-600 space-y-1">
+            <div className="mt-4 space-y-1 text-sm text-slate-600">
               <p>
                 <strong>Status:</strong>{" "}
                 {isEpisodeFinalized ? "Voting closed, rewards unlocked." : "Voting open."}
@@ -548,25 +557,25 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="mt-6 rounded-2xl border bg-gray-50 p-4">
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <h3 className="text-lg font-semibold">Your Storis NFT</h3>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-slate-600">
                     Alchemy checks your connected wallet for the voter pass NFT.
                   </p>
                 </div>
                 <button
                   onClick={() => loadClaimedNfts()}
                   disabled={!wallet || !rewardNftAddress || loadingClaimedNfts}
-                  className="bg-white border px-4 py-2 rounded-full text-sm font-medium hover:bg-gray-100 transition disabled:opacity-60"
+                  className="rounded-full border bg-white px-4 py-2 text-sm font-semibold transition hover:bg-slate-100 disabled:opacity-60"
                 >
                   {loadingClaimedNfts ? "Checking..." : "Refresh NFT"}
                 </button>
               </div>
 
               {!wallet ? (
-                <p className="mt-4 text-sm text-gray-600">
+                <p className="mt-4 text-sm text-slate-600">
                   Connect your wallet to see your claimed NFT.
                 </p>
               ) : claimedNftsError ? (
@@ -574,7 +583,7 @@ export default function Home() {
                   {claimedNftsError}
                 </p>
               ) : loadingClaimedNfts ? (
-                <p className="mt-4 text-sm text-gray-600">
+                <p className="mt-4 text-sm text-slate-600">
                   Looking for your Storis NFT...
                 </p>
               ) : claimedNfts.length > 0 ? (
@@ -584,17 +593,31 @@ export default function Home() {
                   ))}
                 </div>
               ) : (
-                <p className="mt-4 text-sm text-gray-600">
+                <p className="mt-4 text-sm text-slate-600">
                   No Storis NFT found yet. Claim rewards after finalization, then refresh.
                 </p>
               )}
             </div>
           </section>
 
-        <section className="bg-white rounded-3xl shadow-lg border p-8 mb-10">
-          <h2 className="text-3xl font-bold mb-4">
-            Strawberrina and Bananino: The Next Part
-          </h2>
+        <section className="rounded-[2.5rem] border border-slate-900 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.1)] md:p-8">
+          <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.22em] text-rose-600">
+                Story studio
+              </p>
+              <h2 className="mt-2 text-4xl font-black">
+                Strawberrina and Bananino
+              </h2>
+              <p className="mt-2 max-w-2xl text-slate-600">
+                A creator-owned episode where the community decides the next
+                chapter and receives proof of participation.
+              </p>
+            </div>
+            <span className="rounded-full bg-amber-100 px-4 py-2 text-sm font-bold text-amber-900">
+              Episode #{episodeId}
+            </span>
+          </div>
 
           <div className="grid gap-6 md:grid-cols-2 mb-8">
             <div>
@@ -602,7 +625,7 @@ export default function Home() {
               <video
                 src="/part1.mp4"
                 controls
-                className="w-full rounded-2xl border bg-black"
+                className="aspect-video w-full rounded-2xl border bg-black object-cover"
               >
                 Your browser does not support the video tag.
               </video>
@@ -616,7 +639,7 @@ export default function Home() {
                   src="/part2.mp4"
                   controls
                   muted
-                  className="w-full rounded-2xl border bg-black"
+                  className="aspect-video w-full rounded-2xl border bg-black object-cover"
                 >
                   Your browser does not support the video tag.
                 </video>
@@ -624,25 +647,30 @@ export default function Home() {
             )}
           </div>
 
-          <p className="text-gray-700 mb-4 leading-7">
+          <div className="mb-8 rounded-2xl border border-slate-200 bg-[#fffaf1] p-5">
+          <p className="text-slate-700 mb-4 leading-7">
             Strawberrina looks deeply into Bananino&apos;s eyes and swears to
             him that the baby is, in fact, his. “I love you so much. I would
             never cheat on you again, Bananino, I swear.”
           </p>
 
-          <p className="text-gray-700 mb-6 leading-7">
+          <p className="text-slate-700 leading-7">
             Bananino looks at Strawberrina with deep hurt and a certain kind of
             longing for the early days, when their relationship was perfect and
             before... before he knew what Strawberrina had done. His face twists
             in anguish as he remembers that Limoncello also had a bite of what
             he once thought was only his.
           </p>
+          </div>
 
-          <div className="bg-pink-50 border border-pink-100 rounded-2xl p-4 mb-8">
-            <h3 className="text-xl font-semibold mb-2">Choose the baby daddy</h3>
-            <p className="text-gray-600 text-sm">
-              Connect MetaMask on Sepolia and cast one on-chain vote. After
-              finalization, voters can claim an NFT and STORIS reward.
+          <div className="mb-8 rounded-2xl border border-pink-200 bg-pink-50 p-5">
+            <h3 className="mb-2 text-xl font-bold">
+              Community decides the next chapter
+            </h3>
+            <p className="text-sm text-slate-600">
+              Connect MetaMask on Sepolia and cast one on-chain vote. After the
+              episode is finalized, supporters can claim a voter pass NFT and
+              STORIS reward.
             </p>
           </div>
 
@@ -681,12 +709,12 @@ export default function Home() {
             />
           </div>
 
-          <div className="mt-8 bg-gray-50 border rounded-2xl p-5">
+          <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-5">
             <h4 className="text-lg font-semibold mb-2">Live results</h4>
             {loadingVotes ? (
-              <p className="text-gray-600">Loading votes...</p>
+              <p className="text-slate-600">Loading votes...</p>
             ) : (
-              <p className="text-gray-700">
+              <p className="text-slate-700">
                 <strong>{winner.name}</strong> is leading with{" "}
                 <strong>{winner.votes}</strong> vote
                 {winner.votes === 1 ? "" : "s"}.
@@ -700,18 +728,18 @@ export default function Home() {
             )}
 
             {submittingVote && (
-              <p className="mt-3 text-gray-500 text-sm">Submitting vote...</p>
+              <p className="mt-3 text-sm text-slate-500">Submitting vote...</p>
             )}
 
           </div>
 
-          <div className="mt-8 rounded-2xl border border-yellow-200 bg-yellow-50 p-5">
+          <div className="mt-8 rounded-2xl border border-amber-300 bg-amber-50 p-5">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <h4 className="text-lg font-semibold">
-                  Generate the next episode
+                  Generate story continuation
                 </h4>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-slate-600">
                   Use the current winning vote to create the next Storis
                   chapter instantly.
                 </p>
@@ -719,7 +747,7 @@ export default function Home() {
               <button
                 onClick={generateNextEpisode}
                 disabled={loadingVotes || generatingStory || totalVotes === 0}
-                className="bg-yellow-500 text-black px-6 py-3 rounded-full font-semibold hover:opacity-90 transition disabled:opacity-60"
+                className="rounded-full bg-amber-500 px-6 py-3 font-bold text-black transition hover:bg-amber-400 disabled:opacity-60"
               >
                 {generatingStory
                   ? "Generating Episode..."
@@ -738,11 +766,11 @@ export default function Home() {
                 <p className="text-sm font-semibold uppercase tracking-[0.2em] text-pink-600">
                   Episode #{generatedStory.episodeId}
                 </p>
-                <p className="mt-2 text-sm text-gray-600">
+                <p className="mt-2 text-sm text-slate-600">
                   Based on the winning vote: {generatedStory.winner}.{" "}
                   {generatedStory.winnerName}
                 </p>
-                <div className="mt-4 whitespace-pre-line text-gray-800 leading-7">
+                <div className="mt-4 whitespace-pre-line text-slate-800 leading-7">
                   {generatedStory.story}
                 </div>
               </div>
@@ -764,6 +792,37 @@ type VoteCardProps = {
   disabled: boolean;
   onVote: (option: VoteOption) => void;
 };
+
+function WorkflowStep({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <p className="text-sm font-black uppercase tracking-[0.18em] text-violet-700">
+        {title}
+      </p>
+      <p className="mt-2 text-sm leading-5 text-slate-600">{body}</p>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-white/10 p-4">
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+        {label}
+      </p>
+      <p className="mt-2 text-xl font-black text-white">{value}</p>
+    </div>
+  );
+}
+
+function ModuleRow({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <p className="font-bold">{title}</p>
+      <p className="text-right text-sm text-slate-500">{detail}</p>
+    </div>
+  );
+}
 
 function VoteCard({
   option,
