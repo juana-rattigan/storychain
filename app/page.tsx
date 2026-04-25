@@ -45,7 +45,7 @@ const OPTION_TO_INDEX: Record<VoteOption, number> = {
 const INDEX_TO_OPTION: VoteOption[] = ["A", "B", "C"];
 
 export default function Home() {
-  const [episodeId] = useState(1);
+  const [episodeId] = useState(2);
   const [wallet, setWallet] = useState("");
   const [selected, setSelected] = useState<VoteOption | "">("");
   const [votes, setVotes] = useState<VoteCounts>({
@@ -767,7 +767,7 @@ export default function Home() {
                   Episode #{generatedStory.episodeId}
                 </p>
                 <p className="mt-2 text-sm text-slate-600">
-                  Based on the winning vote: {generatedStory.winner}.{" "}
+                  Based on the community vote: {generatedStory.winner}.{" "}
                   {generatedStory.winnerName}
                 </p>
                 <div className="mt-4 whitespace-pre-line text-slate-800 leading-7">
@@ -849,7 +849,7 @@ function VoteCard({
         alt={name}
         width={500}
         height={500}
-        className="w-full h-64 object-cover rounded-xl mb-4 bg-gray-100"
+        className="w-full h-64 object-cover object-[center_35%] rounded-xl mb-4 bg-gray-100"
       />
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-xl font-bold">

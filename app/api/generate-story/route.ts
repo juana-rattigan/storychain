@@ -16,7 +16,7 @@ export async function POST(req: Request) {
         messages: [
           {
             role: "user",
-            content: `Write the next dramatic episode of StoryChain. ${winner} won the vote. Make it funny, dramatic, and short.`,
+            content: `Write the next dramatic episode of Storis. ${winner} won the vote. Make it funny, dramatic, and short.`,
           },
         ],
       }),
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
     const story =
       data.choices?.[0]?.message?.content ||
-      "Chaos erupts in the fruit kingdom.";
+      "Chaos erupts in the coast, as bananino finds out Strawberrina is leaving him for Manganello and having his baby";
 
     return NextResponse.json({ story });
   } catch (error) {
