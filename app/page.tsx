@@ -523,7 +523,7 @@ export default function Home() {
             </div>
             <div className="rounded-[2rem] border border-slate-900/10 bg-white p-6 shadow-sm">
               <p className="text-sm font-bold uppercase tracking-[0.22em] text-rose-600">
-                MVP modules
+                Core Product
               </p>
               <div className="mt-4 grid gap-3">
                 <ModuleRow title="On-chain voting" detail="Ethereum Sepolia" />
@@ -829,7 +829,7 @@ export default function Home() {
             {generatedStory && (
               <div className="mt-6 rounded-2xl bg-white p-5 shadow-sm">
                 <p className="text-sm font-semibold uppercase tracking-[0.2em] text-pink-600">
-                  Episode #{generatedStory.episodeId}
+                  Episode #2
                 </p>
                 <p className="mt-2 text-sm text-slate-600">
                   Based on the community vote: {generatedStory.winner}.{" "}
